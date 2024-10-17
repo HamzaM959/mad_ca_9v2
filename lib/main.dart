@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:path/path.dart';
 import 'package:provider/provider.dart';
-import 'package:sqflite/sqflite.dart';
+import 'helper.dart'; // 导入 helper.dart
 
 void main() => runApp(MyApp());
 
@@ -19,97 +18,31 @@ class MyApp extends StatelessWidget {
 }
 
 class DatabaseProvider with ChangeNotifier {
-  Database? _database;
-
-  Future<Database> get database async {
-    if (_database != null) return _database!;
-    _database = await _initDatabase();
-    return _database!;
-  }
-
-  Future<Database> _initDatabase() async {
-    final path = join(await getDatabasesPath(), 'card_manager.db');
-    return await openDatabase(
-      path,
-      onCreate: _onCreate,
-      version: 1,
-    );
-  }
-
-  Future<void> _onCreate(Database db, int version) async {
-    await db.execute(
-      'CREATE TABLE Folders (id INTEGER PRIMARY KEY, name TEXT, timestamp TEXT)',
-    );
-    await db.execute(
-      'CREATE TABLE Cards (id INTEGER PRIMARY KEY, name TEXT, suit TEXT, imageUrl TEXT, folderId INTEGER, FOREIGN KEY(folderId) REFERENCES Folders(id))',
-    );
-
-    for (var suit in ['Spades', 'Clubs', 'Hearts', 'Diamonds']) {
-      await db.insert('Folders', {
-        'name': suit,
-        'timestamp': DateTime.now().toString(),
-      });
-    }
-
-    final List<Map<String, dynamic>> cards = [];
-    for (var suit in ['Spades', 'Clubs', 'Hearts', 'Diamonds']) {
-      for (var i = 1; i <= 13; i++) {
-        final name = i == 1
-            ? 'Ace'
-            : i == 11
-            ? 'Jack'
-            : i == 12
-            ? 'Queen'
-            : i == 13
-            ? 'King'
-            : i.toString();
-        cards.add({
-          'name': '$name of $suit',
-          'suit': suit,
-          'imageUrl': 'assets/${name.toLowerCase()}_of_${suit.toLowerCase()}.png',
-        });
-      }
-    }
-
-    for (var card in cards) {
-      await db.insert('Cards', card);
-    }
-  }
-
   Future<List<Map<String, dynamic>>> getFolders() async {
-    final db = await database;
-    return await db.query('Folders');
+    return await DatabaseHelper.instance.getFolders();
   }
 
   Future<List<Map<String, dynamic>>> getCards(int folderId) async {
-    final db = await database;
-    return await db.query('Cards', where: 'folderId = ?', whereArgs: [folderId]);
+    return await DatabaseHelper.instance.getCards(folderId);
   }
 
   Future<void> addFolder(String name) async {
-    final db = await database;
-    await db.insert('Folders', {
-      'name': name,
-      'timestamp': DateTime.now().toString(),
-    });
+    await DatabaseHelper.instance.addFolder(name);
     notifyListeners();
   }
 
   Future<void> addCard(String name, String suit, String imageUrl, int folderId) async {
-    final db = await database;
-    await db.insert('Cards', {'name': name, 'suit': suit, 'imageUrl': imageUrl, 'folderId': folderId});
+    await DatabaseHelper.instance.addCard(name, suit, imageUrl, folderId);
     notifyListeners();
   }
 
   Future<void> deleteCard(int cardId) async {
-    final db = await database;
-    await db.delete('Cards', where: 'id = ?', whereArgs: [cardId]);
+    await DatabaseHelper.instance.deleteCard(cardId);
     notifyListeners();
   }
 
   Future<void> updateFolderName(int folderId, String newName) async {
-    final db = await database;
-    await db.update('Folders', {'name': newName}, where: 'id = ?', whereArgs: [folderId]);
+    await DatabaseHelper.instance.updateFolderName(folderId, newName);
     notifyListeners();
   }
 }
@@ -147,9 +80,10 @@ class FolderScreen extends StatelessWidget {
                   child: Text(folder['name']),
                 ),
                 onTap: () {
-                  // get folder name
                   final folderName = folder['name'];
-                  Navigator.of(context).push(MaterialPageRoute(builder: (context) => CardScreen(folderId: folder['id'], folderName: folder['name'])));
+                  Navigator.of(context).push(MaterialPageRoute(
+                    builder: (context) => CardScreen(folderId: folder['id'], folderName: folderName),
+                  ));
                 },
               );
             },
@@ -353,11 +287,10 @@ class _AddCardDialogState extends State<AddCardDialog> {
 
             //check if the card is in current folder
             bool cardExists = existingCards.any((card) =>
-            card['name'] == selectedCardName &&
-                card['suit'] == selectedSuit);
+            card['name'] == selectedCardName && card['suit'] == selectedSuit);
 
             if (existingCards.length >= 6) {
-              // not more tha 6 cards
+              // not more than 6 cards
               showDialog(
                 context: context,
                 builder: (BuildContext context) {
@@ -375,8 +308,8 @@ class _AddCardDialogState extends State<AddCardDialog> {
                   );
                 },
               );
-            }else if (cardExists) {
-              // make sure the card ii not in the folder
+            } else if (cardExists) {
+              // make sure the card is not already in the folder
               showDialog(
                 context: context,
                 builder: (BuildContext context) {
@@ -394,8 +327,8 @@ class _AddCardDialogState extends State<AddCardDialog> {
                   );
                 },
               );
-            }else if (selectedSuit.toLowerCase() != widget.folderName.toLowerCase()) {
-              // make sure same suit
+            } else if (selectedSuit.toLowerCase() != widget.folderName.toLowerCase()) {
+              // make sure the suit matches
               showDialog(
                 context: context,
                 builder: (BuildContext context) {
