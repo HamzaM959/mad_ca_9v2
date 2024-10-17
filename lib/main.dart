@@ -246,6 +246,25 @@ class CardScreen extends StatelessWidget {
                 onTap: () {
                   if (cards.length > 3) {
                     dbProvider.deleteCard(card['id']);
+                  }else{
+                    showDialog(
+                      context: context,
+                      builder: (BuildContext context) {
+                        return AlertDialog(
+                          title: Text('Card Limit Reached'),
+                          content: Text('You cannot have fewer than 3 cards in this folder.'),
+                          actions: [
+                            TextButton(
+                              onPressed: () {
+                                Navigator.of(context).pop();
+                              },
+                              child: Text('OK'),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                    return;
                   }
                 },
                 child: Image.asset(card['imageUrl']),
