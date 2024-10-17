@@ -257,8 +257,33 @@ class CardScreen extends StatelessWidget {
     );
   }
 
-  void _addCardDialog(BuildContext context, int folderId) {
+  void _addCardDialog(BuildContext context, int folderId) async {
     final dbProvider = Provider.of<DatabaseProvider>(context, listen: false);
+
+    // get the numbers of cards in the folder
+    final existingCards = await dbProvider.getCards(folderId);
+
+    // the number of cards is more tha 6
+    if(existingCards.length >= 6){
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: Text('Card Limit Reached'),
+            content: Text('You cannot add more than 6 cards to this folder.'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: Text('OK'),
+              ),
+            ],
+          );
+        },
+      );
+      return;
+    }
 
     showDialog(
       context: context,
