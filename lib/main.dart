@@ -57,12 +57,12 @@ class DatabaseProvider with ChangeNotifier {
         final name = i == 1
             ? 'Ace'
             : i == 11
-                ? 'Jack'
-                : i == 12
-                    ? 'Queen'
-                    : i == 13
-                        ? 'King'
-                        : i.toString();
+            ? 'Jack'
+            : i == 12
+            ? 'Queen'
+            : i == 13
+            ? 'King'
+            : i.toString();
         cards.add({
           'name': '$name of $suit',
           'suit': suit,
@@ -147,7 +147,9 @@ class FolderScreen extends StatelessWidget {
                   child: Text(folder['name']),
                 ),
                 onTap: () {
-                  Navigator.of(context).push(MaterialPageRoute(builder: (context) => CardScreen(folderId: folder['id'])));
+                  // get folder name
+                  final folderName = folder['name'];
+                  Navigator.of(context).push(MaterialPageRoute(builder: (context) => CardScreen(folderId: folder['id'], folderName: folder['name'])));
                 },
               );
             },
@@ -214,8 +216,9 @@ class FolderScreen extends StatelessWidget {
 
 class CardScreen extends StatelessWidget {
   final int folderId;
+  final String folderName;
 
-  CardScreen({required this.folderId});
+  CardScreen({required this.folderId, required this.folderName});
 
   @override
   Widget build(BuildContext context) {
@@ -227,7 +230,7 @@ class CardScreen extends StatelessWidget {
           IconButton(
             icon: Icon(Icons.add),
             onPressed: () {
-              _addCardDialog(context, folderId);
+              _addCardDialog(context, folderId, folderName);
             },
           ),
         ],
@@ -246,7 +249,7 @@ class CardScreen extends StatelessWidget {
                 onTap: () {
                   if (cards.length > 3) {
                     dbProvider.deleteCard(card['id']);
-                  }else{
+                  } else {
                     showDialog(
                       context: context,
                       builder: (BuildContext context) {
@@ -276,85 +279,149 @@ class CardScreen extends StatelessWidget {
     );
   }
 
-  void _addCardDialog(BuildContext context, int folderId) async {
-    final dbProvider = Provider.of<DatabaseProvider>(context, listen: false);
-
-    // get the numbers of cards in the folder
-    final existingCards = await dbProvider.getCards(folderId);
-
-    // the number of cards is more tha 6
-    if(existingCards.length >= 6){
-      showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: Text('Card Limit Reached'),
-            content: Text('You cannot add more than 6 cards to this folder.'),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-                child: Text('OK'),
-              ),
-            ],
-          );
-        },
-      );
-      return;
-    }
-
+  void _addCardDialog(BuildContext context, int folderId, String folderName) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        final List<String> suits = ['Spades', 'Clubs', 'Hearts', 'Diamonds'];
-        final List<String> cardNames = ['Ace', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'Jack', 'Queen', 'King'];
-        String selectedSuit = suits[0];
-        String selectedCardName = cardNames[0];
-
-        return AlertDialog(
-          title: Text('Add Card'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropdownButton<String>(
-                value: selectedSuit,
-                onChanged: (String? newValue) {
-                  selectedSuit = newValue!;
-                },
-                items: suits.map<DropdownMenuItem<String>>((String value) {
-                  return DropdownMenuItem<String>(
-                    value: value,
-                    child: Text(value),
-                  );
-                }).toList(),
-              ),
-              DropdownButton<String>(
-                value: selectedCardName,
-                onChanged: (String? newValue) {
-                  selectedCardName = newValue!;
-                },
-                items: cardNames.map<DropdownMenuItem<String>>((String value) {
-                  return DropdownMenuItem<String>(
-                    value: value,
-                    child: Text(value),
-                  );
-                }).toList(),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                final imageUrl = 'assets/${selectedCardName.toLowerCase()}_of_${selectedSuit.toLowerCase()}.png';
-                dbProvider.addCard(selectedCardName, selectedSuit, imageUrl, folderId);
-                Navigator.of(context).pop();
-              },
-              child: Text('Add'),
-            ),
-          ],
-        );
+        return AddCardDialog(folderId: folderId, folderName: folderName);
       },
+    );
+  }
+}
+
+class AddCardDialog extends StatefulWidget {
+  final int folderId;
+  final String folderName;
+
+  AddCardDialog({required this.folderId, required this.folderName});
+
+  @override
+  _AddCardDialogState createState() => _AddCardDialogState();
+}
+
+class _AddCardDialogState extends State<AddCardDialog> {
+  String selectedSuit = 'Spades';
+  String selectedCardName = 'Ace';
+
+  final List<String> suits = ['Spades', 'Clubs', 'Hearts', 'Diamonds'];
+  final List<String> cardNames = ['Ace', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'Jack', 'Queen', 'King'];
+
+  @override
+  Widget build(BuildContext context) {
+    final dbProvider = Provider.of<DatabaseProvider>(context, listen: false);
+
+    return AlertDialog(
+      title: Text('Add Card'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          DropdownButton<String>(
+            value: selectedSuit,
+            onChanged: (String? newValue) {
+              setState(() {
+                selectedSuit = newValue!;
+              });
+            },
+            items: suits.map<DropdownMenuItem<String>>((String value) {
+              return DropdownMenuItem<String>(
+                value: value,
+                child: Text(value),
+              );
+            }).toList(),
+          ),
+          DropdownButton<String>(
+            value: selectedCardName,
+            onChanged: (String? newValue) {
+              setState(() {
+                selectedCardName = newValue!;
+              });
+            },
+            items: cardNames.map<DropdownMenuItem<String>>((String value) {
+              return DropdownMenuItem<String>(
+                value: value,
+                child: Text(value),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () async {
+            // get the number of cards in current folder
+            final existingCards = await dbProvider.getCards(widget.folderId);
+
+            //check if the card is in current folder
+            bool cardExists = existingCards.any((card) =>
+            card['name'] == selectedCardName &&
+                card['suit'] == selectedSuit);
+
+            if (existingCards.length >= 6) {
+              // not more tha 6 cards
+              showDialog(
+                context: context,
+                builder: (BuildContext context) {
+                  return AlertDialog(
+                    title: Text('Card Limit Reached'),
+                    content: Text('You cannot add more than 6 cards to this folder.'),
+                    actions: [
+                      TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                        child: Text('OK'),
+                      ),
+                    ],
+                  );
+                },
+              );
+            }else if (cardExists) {
+              // make sure the card ii not in the folder
+              showDialog(
+                context: context,
+                builder: (BuildContext context) {
+                  return AlertDialog(
+                    title: Text('Card Already Exists'),
+                    content: Text('This card already exists in this folder.'),
+                    actions: [
+                      TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                        child: Text('OK'),
+                      ),
+                    ],
+                  );
+                },
+              );
+            }else if (selectedSuit.toLowerCase() != widget.folderName.toLowerCase()) {
+              // make sure same suit
+              showDialog(
+                context: context,
+                builder: (BuildContext context) {
+                  return AlertDialog(
+                    title: Text('Invalid Suit'),
+                    content: Text('You can only add ${widget.folderName} cards to this folder.'),
+                    actions: [
+                      TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                        },
+                        child: Text('OK'),
+                      ),
+                    ],
+                  );
+                },
+              );
+            } else {
+              final imageUrl = 'assets/${selectedCardName.toLowerCase()}_of_${selectedSuit.toLowerCase()}.png';
+              await dbProvider.addCard(selectedCardName, selectedSuit, imageUrl, widget.folderId);
+              Navigator.of(context).pop();
+            }
+          },
+          child: Text('Add'),
+        ),
+      ],
     );
   }
 }
